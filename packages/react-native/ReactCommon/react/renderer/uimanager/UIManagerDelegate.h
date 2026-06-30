@@ -97,6 +97,10 @@ class UIManagerDelegate {
   using OnSurfaceStartCallback = std::function<void(const ShadowTree &shadowTree)>;
   virtual void uiManagerShouldSetOnSurfaceStartCallback(OnSurfaceStartCallback &&callback) = 0;
 
+  virtual void uiManagerMeasureAsync(
+    const std::shared_ptr<const ShadowNode>& shadowNode,
+    const std::function<void(folly::dynamic)>& callback) = 0;
+
   virtual ~UIManagerDelegate() noexcept = default;
 };
 

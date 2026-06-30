@@ -34,7 +34,10 @@ internal class StyleAnimatedNode(
   fun collectViewUpdates(propsMap: JavaOnlyMap) {
     for ((key, value) in propMapping) {
       val node = nativeAnimatedNodesManager.getNodeById(value)
-      requireNotNull(node) { "Mapped style node does not exist" }
+      // requireNotNull(node) { "Mapped style node does not exist" }
+      if (node == null) {
+        return
+      }
       if (node is TransformAnimatedNode) {
         node.collectViewUpdates(propsMap)
       } else if (node is ValueAnimatedNode) {
@@ -51,9 +54,10 @@ internal class StyleAnimatedNode(
       } else if (node is ObjectAnimatedNode) {
         node.collectViewUpdates(key, propsMap)
       } else {
-        throw IllegalArgumentException(
-            "Unsupported type of node used in property node ${node.javaClass}"
-        )
+        return
+        // PATCH: COMMENTED OUT EXCEPTION THROWING
+        // throw IllegalArgumentException(
+        //     "Unsupported type of node used in property node ${node.javaClass}")
       }
     }
   }

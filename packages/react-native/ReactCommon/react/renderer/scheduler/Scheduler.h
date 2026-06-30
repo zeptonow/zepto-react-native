@@ -91,6 +91,9 @@ class Scheduler final : public UIManagerDelegate {
       const std::shared_ptr<const ShadowNode> &shadowNode,
       bool isJSResponder,
       bool blockNativeResponder) override;
+  void uiManagerMeasureAsync(
+      const std::shared_ptr<const ShadowNode>& shadowNode,
+      const std::function<void(folly::dynamic)>& callback) override;
   void uiManagerShouldSynchronouslyUpdateViewOnUIThread(Tag tag, const folly::dynamic &props) override;
   void uiManagerDidUpdateShadowTree(const std::unordered_map<Tag, folly::dynamic> &tagToProps) override;
   void uiManagerShouldAddEventListener(std::shared_ptr<const EventListener> listener) final;

@@ -47,9 +47,9 @@ internal class PropsAnimatedNode(
 
   fun connectToView(viewTag: Int, uiManager: UIManager?) {
     if (connectedViewTag != -1) {
-      throw JSApplicationIllegalArgumentException(
-          "Animated node $tag is already attached to a view: $connectedViewTag"
-      )
+      // PATCH: COMMENTED OUT EXCEPTION THROWING
+      // throw JSApplicationIllegalArgumentException(
+      //     "Animated node $tag is already attached to a view: $connectedViewTag")
     }
     connectedViewTag = viewTag
     connectedViewUIManager = uiManager
@@ -57,11 +57,9 @@ internal class PropsAnimatedNode(
 
   fun disconnectFromView(viewTag: Int) {
     if (connectedViewTag != viewTag && connectedViewTag != -1) {
-      throw JSApplicationIllegalArgumentException(
-          "Attempting to disconnect view that has " +
-              "not been connected with the given animated node: $viewTag " +
-              "but is connected to view $connectedViewTag"
-      )
+      // PATCH: COMMENTED OUT EXCEPTION THROWING
+      // throw JSApplicationIllegalArgumentException(
+      //     "Attempting to disconnect view that has not been connected with the given animated node: $viewTag but is connected to view $connectedViewTag")
     }
     connectedViewTag = -1
   }
@@ -92,7 +90,10 @@ internal class PropsAnimatedNode(
     }
     for ((key, value) in propNodeMapping) {
       val node = nativeAnimatedNodesManager.getNodeById(value)
-      requireNotNull(node) { "Mapped property node does not exist" }
+      // requireNotNull(node) { "Mapped property node does not exist" }
+      if (node == null) {
+        return
+      }
       if (node is StyleAnimatedNode) {
         node.collectViewUpdates(propMap)
       } else if (node is ValueAnimatedNode) {
@@ -109,9 +110,9 @@ internal class PropsAnimatedNode(
       } else if (node is ObjectAnimatedNode) {
         node.collectViewUpdates(key, propMap)
       } else {
-        throw IllegalArgumentException(
-            "Unsupported type of node used in property node ${node.javaClass}"
-        )
+        // PATCH: COMMENTED OUT EXCEPTION THROWING
+        // throw IllegalArgumentException(
+        //     "Unsupported type of node used in property node ${node.javaClass}")
       }
     }
     connectedViewUIManager?.synchronouslyUpdateViewOnUIThread(connectedViewTag, propMap)

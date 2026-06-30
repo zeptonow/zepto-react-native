@@ -61,13 +61,22 @@ internal class InterpolationAnimatedNode(config: ReadableMap) : ValueAnimatedNod
   }
 
   override fun onAttachedToNode(parent: AnimatedNode) {
-    check(this.parent == null) { "Parent already attached" }
-    require(parent is ValueAnimatedNode) { "Parent is of an invalid type" }
+    // check(this.parent == null) { "Parent already attached" }
+    // require(parent is ValueAnimatedNode) { "Parent is of an invalid type" }
+    if(this.parent != null) {
+      return;
+    }
+    if(parent !is ValueAnimatedNode ) {
+      return;
+    }
     this.parent = parent
   }
 
   override fun onDetachedFromNode(parent: AnimatedNode) {
-    require(parent === this.parent) { "Invalid parent node provided" }
+    // require(parent === this.parent) { "Invalid parent node provided" }
+    if (parent != this.parent) {
+      return
+    }
     this.parent = null
   }
 
@@ -183,10 +192,10 @@ internal class InterpolationAnimatedNode(config: ReadableMap) : ValueAnimatedNod
           EXTRAPOLATE_TYPE_IDENTITY -> return result
           EXTRAPOLATE_TYPE_CLAMP -> result = inputMin
           EXTRAPOLATE_TYPE_EXTEND -> {}
-          else ->
-              throw JSApplicationIllegalArgumentException(
-                  "Invalid extrapolation type " + extrapolateLeft + "for left extrapolation"
-              )
+          else -> return result
+          // PATCH: COMMENTED OUT EXCEPTION THROWING
+          // throw JSApplicationIllegalArgumentException(
+          //     "Invalid extrapolation type " + extrapolateLeft + "for left extrapolation")
         }
       }
       if (result > inputMax) {
@@ -194,10 +203,10 @@ internal class InterpolationAnimatedNode(config: ReadableMap) : ValueAnimatedNod
           EXTRAPOLATE_TYPE_IDENTITY -> return result
           EXTRAPOLATE_TYPE_CLAMP -> result = inputMax
           EXTRAPOLATE_TYPE_EXTEND -> {}
-          else ->
-              throw JSApplicationIllegalArgumentException(
-                  "Invalid extrapolation type " + extrapolateRight + "for right extrapolation"
-              )
+          else -> return result
+          // PATCH: COMMENTED OUT EXCEPTION THROWING
+          // throw JSApplicationIllegalArgumentException(
+          //     "Invalid extrapolation type " + extrapolateRight + "for right extrapolation")
         }
       }
       if (outputMin == outputMax) {
