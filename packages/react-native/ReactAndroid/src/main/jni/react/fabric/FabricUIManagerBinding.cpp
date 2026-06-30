@@ -805,6 +805,14 @@ void FabricUIManagerBinding::onAnimationStarted() {
   mountingManager->onAnimationStarted();
 }
 
+void FabricUIManagerBinding::schedulerMeasureAsync(
+  const ShadowView& shadowView,
+  const std::function<void(folly::dynamic)>& callback) {
+  if (mountingManager_) {
+    mountingManager_->measureAsync(shadowView, callback);
+  }
+}
+
 void FabricUIManagerBinding::onAllAnimationsComplete() {
   auto mountingManager = getMountingManager("onAnimationComplete");
   if (!mountingManager) {

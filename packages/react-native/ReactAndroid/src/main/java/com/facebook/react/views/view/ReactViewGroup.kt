@@ -652,6 +652,74 @@ public open class ReactViewGroup public constructor(context: Context?) :
   internal fun getChildAtWithSubviewClippingEnabled(index: Int): View? =
       if (index in 0..<allChildrenCount) checkNotNull(allChildren)[index] else null
 
+  /**
+   * Override getChildAt to prevent null child crashes in dispatchGetDisplayList. This handles race
+   * conditions where views are removed from the hierarchy while Android's rendering system is still
+   * traversing them for display list generation.
+   *
+   * Fixes crashes:
+   * - IllegalStateException: ReactViewGroup contains null child at index X
+   * - NullPointerException: Attempt to read from field 'int android.view.View.mViewFlags'
+   */
+  override fun getChildAt(index: Int): View {
+    try {
+      // Validate index bounds
+      if (index < 0 || index >= childCount) {
+        return crashSafePlaceholderChild
+      }
+
+      var child: View? = super.getChildAt(index)
+
+      // Additional safety check for null children during concurrent modifications
+      val backupChildren = allChildren
+      if (child == null && _removeClippedSubviews && backupChildren != null) {
+        // Try to get from backup array if available and index is valid
+        if (index < allChildrenCount) {
+          child = backupChildren[index]
+          if (child != null) {
+            FLog.w(TAG, "getChildAt recovered null child from mAllChildren at index: $index")
+          }
+        }
+      }
+
+      // Fall back to a safe placeholder if still null for a valid index (concurrent removal race).
+      if (child == null) {
+        FLog.w(
+            TAG,
+            "getChildAt returning placeholder for index: $index childCount: $childCount" +
+                " removeClippedSubviews: $_removeClippedSubviews")
+        return crashSafePlaceholderChild
+      }
+
+      return child
+    } catch (e: IndexOutOfBoundsException) {
+      FLog.e(TAG, "Error getting child at index $index childCount: $childCount", e)
+      return crashSafePlaceholderChild
+    } catch (e: NullPointerException) {
+      FLog.e(TAG, "Error getting child at index $index childCount: $childCount", e)
+      return crashSafePlaceholderChild
+    }
+  }
+
+  // Returned by getChildAt only on the rare race / out-of-bounds path so callers — including
+  // third-party libs (gesture-handler, screens, …) that assume a non-null child — never NPE during
+  // concurrent child removal. Covariant non-null return keeps the platform contract intact.
+  private val crashSafePlaceholderChild: View by lazy { View(context) }
+
+  /**
+   * Override getChildCount to add safety during concurrent modifications. Ensures the count is
+   * always valid and prevents crashes in display list traversal.
+   */
+  override fun getChildCount(): Int {
+    return try {
+      // Validate the count is non-negative
+      max(0, super.getChildCount())
+    } catch (e: Exception) {
+      FLog.e(TAG, "Error getting child count", e)
+      0
+    }
+  }
+
   internal fun addViewWithSubviewClippingEnabled(
       child: View,
       index: Int,
@@ -851,27 +919,32 @@ public open class ReactViewGroup public constructor(context: Context?) :
   }
 
   override fun draw(canvas: Canvas) {
-    if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            getUIManagerType(this) == UIManagerType.FABRIC &&
-            needsIsolatedLayer(this)
-    ) {
-      // Check if the view is a stacking context and has children, if it does, do the rendering
-      // offscreen and then composite back. This follows the idea of group isolation on blending
-      // https://www.w3.org/TR/compositing-1/#isolationblending
+    // PATCH (PR#17): guard display-list generation (dispatchGetDisplayList) against NPE
+    try {
+      if (
+          Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+              getUIManagerType(this) == UIManagerType.FABRIC &&
+              needsIsolatedLayer(this)
+      ) {
+        // Check if the view is a stacking context and has children, if it does, do the rendering
+        // offscreen and then composite back. This follows the idea of group isolation on blending
+        // https://www.w3.org/TR/compositing-1/#isolationblending
 
-      val overflowInset = overflowInset
-      canvas.saveLayer(
-          overflowInset.left.toFloat(),
-          overflowInset.top.toFloat(),
-          (width + -overflowInset.right).toFloat(),
-          (height + -overflowInset.bottom).toFloat(),
-          null,
-      )
-      super.draw(canvas)
-      canvas.restore()
-    } else {
-      super.draw(canvas)
+        val overflowInset = overflowInset
+        canvas.saveLayer(
+            overflowInset.left.toFloat(),
+            overflowInset.top.toFloat(),
+            (width + -overflowInset.right).toFloat(),
+            (height + -overflowInset.bottom).toFloat(),
+            null,
+        )
+        super.draw(canvas)
+        canvas.restore()
+      } else {
+        super.draw(canvas)
+      }
+    } catch (e: NullPointerException) {
+      // NPE from dispatchGetDisplayList during draw/updateDisplayListIfDirty
     }
   }
 
@@ -879,47 +952,81 @@ public open class ReactViewGroup public constructor(context: Context?) :
     if (_overflow != Overflow.VISIBLE || getTag(R.id.filter) != null) {
       clipToPaddingBox(this, canvas)
     }
-    super.dispatchDraw(canvas)
+    // PATCH (PR#17): Fabric may remove a child while the render thread traverses -> NPE/IllegalState
+    try {
+      super.dispatchDraw(canvas)
+    } catch (e: NullPointerException) {
+      if (e.message?.contains("mViewFlags") == true) {
+        return
+      }
+      throw e
+    } catch (e: IllegalStateException) {
+      if (e.message?.contains("null child") == true) {
+        return
+      }
+      throw e
+    }
   }
 
-  override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
-    val drawWithZ = child.elevation > 0
-
-    if (drawWithZ) {
-      enableZ(canvas, true)
-    }
-
-    var mixBlendMode: BlendMode? = null
-    if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            getUIManagerType(this) == UIManagerType.FABRIC &&
-            needsIsolatedLayer(this)
-    ) {
-      mixBlendMode = child.getTag(R.id.mix_blend_mode) as? BlendMode
-      if (mixBlendMode != null) {
-        val p = Paint()
-        p.blendMode = mixBlendMode
-        val overflowInset = overflowInset
-        canvas.saveLayer(
-            overflowInset.left.toFloat(),
-            overflowInset.top.toFloat(),
-            (width + -overflowInset.right).toFloat(),
-            (height + -overflowInset.bottom).toFloat(),
-            p,
-        )
+  override fun drawChild(canvas: Canvas, child: View?, drawingTime: Long): Boolean {
+    // PATCH (PR#17): null-child guard + swallow draw exceptions (Fabric removed child mid-traverse)
+    try {
+      if (child == null) {
+        FLog.w(TAG, "drawChild called with null child, skipping draw")
+        return false
       }
-    }
 
-    val result = super.drawChild(canvas, child, drawingTime)
+      val drawWithZ = child.elevation > 0
 
-    if (mixBlendMode != null) {
-      canvas.restore()
-    }
+      if (drawWithZ) {
+        enableZ(canvas, true)
+      }
 
-    if (drawWithZ) {
-      enableZ(canvas, false)
+      var mixBlendMode: BlendMode? = null
+      if (
+          Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+              getUIManagerType(this) == UIManagerType.FABRIC &&
+              needsIsolatedLayer(this)
+      ) {
+        mixBlendMode = child.getTag(R.id.mix_blend_mode) as? BlendMode
+        if (mixBlendMode != null) {
+          val p = Paint()
+          p.blendMode = mixBlendMode
+          val overflowInset = overflowInset
+          canvas.saveLayer(
+              overflowInset.left.toFloat(),
+              overflowInset.top.toFloat(),
+              (width + -overflowInset.right).toFloat(),
+              (height + -overflowInset.bottom).toFloat(),
+              p,
+          )
+        }
+      }
+
+      val result = super.drawChild(canvas, child, drawingTime)
+
+      if (mixBlendMode != null) {
+        canvas.restore()
+      }
+
+      if (drawWithZ) {
+        enableZ(canvas, false)
+      }
+      return result
+    } catch (e: Exception) {
+      return false
     }
-    return result
+  }
+
+  // PATCH (PR#17): firebase crash fix — guard visibility propagation
+  override fun dispatchVisibilityChanged(changedView: View, visibility: Int) {
+    try {
+      super.dispatchVisibilityChanged(changedView, visibility)
+    } catch (e: NullPointerException) {
+      FLog.w(TAG, "Safe dispatchVisibilityChanged: ${e.message}")
+    } catch (e: IndexOutOfBoundsException) {
+      FLog.w(TAG, "Safe dispatchVisibilityChanged: ${e.message}")
+    }
   }
 
   public fun setOpacityIfPossible(opacity: Float) {
