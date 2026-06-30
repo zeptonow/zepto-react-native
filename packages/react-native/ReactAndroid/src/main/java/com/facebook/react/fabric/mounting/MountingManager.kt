@@ -7,11 +7,14 @@
 
 package com.facebook.react.fabric.mounting
 
+import android.graphics.RectF
 import android.view.View
+import android.view.ViewParent
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import com.facebook.common.logging.FLog
 import com.facebook.infer.annotation.ThreadConfined
+import com.facebook.react.bridge.Callback
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.ReactSoftExceptionLogger.logSoftException
 import com.facebook.react.bridge.ReadableArray
@@ -22,7 +25,10 @@ import com.facebook.react.bridge.WritableMap
 import com.facebook.react.fabric.events.EventEmitterWrapper
 import com.facebook.react.fabric.mounting.mountitems.MountItem
 import com.facebook.react.touch.JSResponderHandler
+import com.facebook.react.uimanager.IllegalViewOperationException
+import com.facebook.react.uimanager.PixelUtil
 import com.facebook.react.uimanager.RootViewManager
+import com.facebook.react.uimanager.RootViewUtil
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewManagerRegistry
 import com.facebook.react.uimanager.common.ViewUtil
@@ -351,6 +357,78 @@ internal class MountingManager(
   private fun getSurfaceMountingManager(surfaceId: Int, reactTag: Int): SurfaceMountingManager? =
       if (surfaceId == ViewUtil.NO_SURFACE_ID) getSurfaceManagerForView(reactTag)
       else getSurfaceManager(surfaceId)
+
+  /**
+   * measureAsyncOnUI support: measure a view (by tag) on the UI thread and report its window-relative
+   * bounds back to JS via [callback]. Ported from the zepto RN fork (PR #17).
+   */
+  @Synchronized
+  fun measure(surfaceId: Int, reactTag: Int, callback: Callback) {
+    assertOnUiThread()
+    val smm = getSurfaceMountingManager(surfaceId, reactTag)
+    if (smm == null) {
+      FLog.e(TAG, "Failed to find surface manager for surfaceId: %d, tag: %d", surfaceId, reactTag)
+      return
+    }
+    val view: View =
+        try {
+          smm.getView(reactTag)
+        } catch (ex: IllegalViewOperationException) {
+          FLog.e(TAG, "Failed to find view for tag: %d. Error: %s", reactTag, ex.message)
+          return
+        }
+    val measureBuffer = IntArray(4)
+    val rootView = RootViewUtil.getRootView(view) as? View
+    if (rootView == null) {
+      // Assume the surface is being torn down; omit the measure.
+      FLog.e(TAG, "Failed to get root view for surfaceId: %d", surfaceId)
+      return
+    }
+    measure(rootView, view, measureBuffer)
+    val x = PixelUtil.toDIPFromPixel(measureBuffer[0].toFloat())
+    val y = PixelUtil.toDIPFromPixel(measureBuffer[1].toFloat())
+    val width = PixelUtil.toDIPFromPixel(measureBuffer[2].toFloat())
+    val height = PixelUtil.toDIPFromPixel(measureBuffer[3].toFloat())
+    callback.invoke(0, 0, width, height, x, y)
+  }
+
+  private fun measure(rootView: View, v: View, outputBuffer: IntArray) {
+    computeBoundingBox(rootView, outputBuffer)
+    val rootX = outputBuffer[0]
+    val rootY = outputBuffer[1]
+    computeBoundingBox(v, outputBuffer)
+    outputBuffer[0] -= rootX
+    outputBuffer[1] -= rootY
+  }
+
+  private fun computeBoundingBox(view: View, outputBuffer: IntArray) {
+    val boundingBox = RectF()
+    boundingBox.set(0f, 0f, view.width.toFloat(), view.height.toFloat())
+    mapRectFromViewToWindowCoords(view, boundingBox)
+    outputBuffer[0] = Math.round(boundingBox.left)
+    outputBuffer[1] = Math.round(boundingBox.top)
+    outputBuffer[2] = Math.round(boundingBox.right - boundingBox.left)
+    outputBuffer[3] = Math.round(boundingBox.bottom - boundingBox.top)
+  }
+
+  private fun mapRectFromViewToWindowCoords(view: View, rect: RectF) {
+    var matrix = view.matrix
+    if (!matrix.isIdentity) {
+      matrix.mapRect(rect)
+    }
+    rect.offset(view.left.toFloat(), view.top.toFloat())
+    var parent: ViewParent? = view.parent
+    while (parent is View) {
+      val parentView = parent
+      rect.offset(-parentView.scrollX.toFloat(), -parentView.scrollY.toFloat())
+      matrix = parentView.matrix
+      if (!matrix.isIdentity) {
+        matrix.mapRect(rect)
+      }
+      rect.offset(parentView.left.toFloat(), parentView.top.toFloat())
+      parent = parentView.parent
+    }
+  }
 
   companion object {
     val TAG: String = MountingManager::class.java.simpleName

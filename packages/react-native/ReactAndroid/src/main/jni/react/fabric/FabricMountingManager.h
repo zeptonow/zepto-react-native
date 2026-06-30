@@ -56,6 +56,10 @@ class FabricMountingManager final {
 
   void scheduleReactRevisionMerge(SurfaceId surfaceId);
 
+  void measureAsync(
+      const ShadowView& shadowView,
+      const std::function<void(folly::dynamic)>& callback);
+
  private:
   bool isOnMainThread();
 

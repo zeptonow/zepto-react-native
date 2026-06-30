@@ -31,7 +31,11 @@ internal class EventAnimationDriver(
       params: WritableMap?,
       @EventCategoryDef category: Int,
   ) {
-    requireNotNull(params) { "Native animated events must have event data." }
+    // requireNotNull(params) { "Native animated events must have event data." }
+
+    if(params == null) {
+      return;
+    }
 
     // Get the new value for the node by looking into the event map using the provided event path.
     var currMap: ReadableMap? = params
@@ -47,7 +51,7 @@ internal class EventAnimationDriver(
           currArray = currMap.getArray(key)
           currMap = null
         } else {
-          throw UnexpectedNativeTypeException("Unexpected type $keyType for key '$key'")
+          // throw UnexpectedNativeTypeException("Unexpected type $keyType for key '$key'")
         }
       } else {
         val index = eventPath[i].toInt()
@@ -59,7 +63,7 @@ internal class EventAnimationDriver(
           currArray = currArray.getArray(index)
           currMap = null
         } else {
-          throw UnexpectedNativeTypeException("Unexpected type $keyType for index '$index'")
+          // throw UnexpectedNativeTypeException("Unexpected type $keyType for index '$index'")
         }
       }
     }

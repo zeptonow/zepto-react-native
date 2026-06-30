@@ -387,7 +387,8 @@ public class NativeAnimatedModule(reactContext: ReactApplicationContext) :
 
             enqueueFrameCallback()
           } catch (ex: Exception) {
-            throw RuntimeException(ex)
+            // NativeAnimated hardening: never crash from the frame callback. Swallow & log.
+            FLog.e(NAME, "Exception while running animation frame callback", ex)
           }
         }
       }
