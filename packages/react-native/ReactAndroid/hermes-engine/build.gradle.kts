@@ -8,10 +8,13 @@
 import com.facebook.react.internal.PrivateReactExtension
 import com.facebook.react.tasks.internal.*
 import de.undercouch.gradle.tasks.download.Download
+import java.io.File
+import java.util.Properties
 import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
   id("signing")
+  id("maven-publish")
   alias(libs.plugins.android.library)
   alias(libs.plugins.download)
 }
@@ -426,6 +429,14 @@ android {
     prefabPublishing = true
   }
 
+  // Publish all build types (debug / release / debugOptimized) as one multi-variant
+  // module, exactly like Meta's published hermes-android AAR.
+  publishing {
+    multipleVariants {
+      allVariants()
+    }
+  }
+
   dependencies {
     implementation(libs.fbjni)
     implementation(libs.yoga.proguard.annotations)
@@ -457,4 +468,37 @@ afterEvaluate {
 tasks.withType<JavaCompile>().configureEach {
   options.compilerArgs.add("-Xlint:deprecation,unchecked")
   options.compilerArgs.add("-Werror")
+}
+
+// Zepto: publish this source-built Hermes as `com.facebook.hermes:hermes-android:<version>`
+// so the hosting maven repo carries a matched pair with react-android. Meta does NOT publish
+// hermes-android from this repo (it comes from the facebook/hermes repo), so we add it here.
+// Version tracks hermesV1Enabled: classic -> HERMES_VERSION_NAME (0.16.0), V1 -> HERMES_V1_VERSION_NAME.
+val hermesArtifactVersion: String =
+    Properties()
+        .apply {
+          File(reactNativeRootDir, "sdks/hermes-engine/version.properties").inputStream().use {
+            load(it)
+          }
+        }
+        .getProperty(if (hermesV1Enabled) "HERMES_V1_VERSION_NAME" else "HERMES_VERSION_NAME")
+
+afterEvaluate {
+  publishing {
+    publications {
+      register<MavenPublication>("hermesAndroid") {
+        groupId = "com.facebook.hermes"
+        artifactId = "hermes-android"
+        version = hermesArtifactVersion
+        from(components["default"])
+      }
+    }
+    repositories {
+      maven {
+        name = "mavenTempLocal"
+        // Output location is user-driven: -PaarOutputRepo=file:///abs/path (default /tmp/maven-local)
+        url = uri((project.findProperty("aarOutputRepo") ?: "file:///tmp/maven-local").toString())
+      }
+    }
+  }
 }

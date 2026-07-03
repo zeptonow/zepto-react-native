@@ -13,7 +13,8 @@ def signingKey = findProperty("SIGNING_KEY")
 def signingPwd = findProperty("SIGNING_PWD")
 
 def reactAndroidProjectDir = project(':packages:react-native:ReactAndroid').projectDir
-def mavenTempLocalUrl = "file:///tmp/maven-local"
+// Output location is user-driven: -PaarOutputRepo=file:///abs/path (default /tmp/maven-local)
+def mavenTempLocalUrl = findProperty("aarOutputRepo") ?: "file:///tmp/maven-local"
 
 publishing {
     publications {
