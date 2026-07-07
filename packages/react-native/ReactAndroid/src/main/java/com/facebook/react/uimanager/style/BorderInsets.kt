@@ -48,7 +48,7 @@ internal class BorderInsets {
       layoutDirection: Int,
       context: Context,
   ): RectF {
-    return when (layoutDirection) {
+    val insets = when (layoutDirection) {
       LayoutDirection.LTR ->
           RectF(
               edgeInsets[LogicalEdge.START.ordinal]
@@ -128,5 +128,11 @@ internal class BorderInsets {
           }
       else -> throw IllegalArgumentException("Expected resolved layout direction")
     }
+
+    if (!insets.left.isFinite()) insets.left = 0f
+    if (!insets.top.isFinite()) insets.top = 0f
+    if (!insets.right.isFinite()) insets.right = 0f
+    if (!insets.bottom.isFinite()) insets.bottom = 0f
+    return insets
   }
 }
