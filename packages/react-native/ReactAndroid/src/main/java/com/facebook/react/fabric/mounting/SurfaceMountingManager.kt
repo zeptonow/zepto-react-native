@@ -281,7 +281,7 @@ internal constructor(
       return
     }
 
-    val parentViewState = getViewState(parentTag)
+    val parentViewState = getNullableViewState(parentTag) ?: return
     if (parentViewState.view !is ViewGroup) {
       val message =
           "Unable to add a view into a view that is not a ViewGroup. ParentTag: $parentTag - Tag: $tag - Index: $index"
@@ -289,7 +289,7 @@ internal constructor(
       throw IllegalStateException(message)
     }
     val parentView = parentViewState.view as ViewGroup
-    val viewState = getViewState(tag)
+    val viewState = getNullableViewState(tag) ?: return
     val view = viewState.view
     checkNotNull(view) { "Unable to find view for viewState $viewState and tag $tag" }
 
@@ -332,16 +332,9 @@ internal constructor(
     try {
       getViewGroupManager(parentViewState).addView(parentView, view, index)
     } catch (e: IllegalStateException) {
-      // Wrap error with more context for debugging
-      throw IllegalStateException(
-          ("addViewAt: failed to insert view [$tag] into parent [$parentTag] at index $index"),
-          e,
-      )
+      return
     } catch (e: IndexOutOfBoundsException) {
-      throw IllegalStateException(
-          ("addViewAt: failed to insert view [$tag] into parent [$parentTag] at index $index"),
-          e,
-      )
+      return
     }
 
     // Display children after inserting
@@ -390,10 +383,7 @@ internal constructor(
 
     val parentView = parentViewState.view
     if (parentView !is ViewGroup) {
-      val message =
-          "Unable to remove a view from a view that is not a ViewGroup. ParentTag: $parentTag - Tag: $tag - Index: $index"
-      FLog.e(TAG, message)
-      throw IllegalStateException(message)
+      return
     }
 
     if (SHOW_CHANGED_VIEW_HIERARCHIES) {
@@ -474,10 +464,7 @@ internal constructor(
 
       logViewHierarchy(parentView, true)
 
-      throw IllegalStateException(
-          "Cannot remove child at index $actualIndex from parent ViewGroup [${parentView.id}], only $childCount children in parent. Warning: childCount may be incorrect!",
-          e,
-      )
+      return
     }
 
     // Display children after deleting any
@@ -607,7 +594,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
 
     if (
         ReactNativeFeatureFlags.overrideBySynchronousMountPropsAtMountingAndroid() &&
@@ -715,9 +702,9 @@ internal constructor(
       return
     }
 
-    val view = getViewState(reactTag).view
+    val view = getNullableViewState(reactTag)?.view
     if (view == null) {
-      throw RetryableMountingLayerException("Unable to find viewState view for tag $reactTag")
+      return
     }
 
     view.sendAccessibilityEvent(eventType)
@@ -738,7 +725,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
     // Do not layout Root Views
     if (viewState.isRoot) {
       return
@@ -811,7 +798,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
     // Do not layout Root Views
     if (viewState.isRoot) {
       return
@@ -837,7 +824,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
     // Do not layout Root Views
     if (viewState.isRoot) {
       return
@@ -863,7 +850,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
 
     val prevStateWrapper = viewState.stateWrapper
     viewState.stateWrapper = stateWrapper
@@ -934,7 +921,7 @@ internal constructor(
       return
     }
 
-    val viewState = getViewState(reactTag)
+    val viewState = getNullableViewState(reactTag) ?: return
     val view = viewState.view
     if (initialReactTag != reactTag && view is ViewParent) {
       // In this case, initialReactTag corresponds to a virtual/layout-only View, and we already
@@ -1051,12 +1038,6 @@ internal constructor(
             "Unable to find view for tag $reactTag. Surface $surfaceId stopped: $isStopped, rootViewAttached: $isRootViewAttached"
         )
   }
-
-  private fun getViewState(reactTag: Int): ViewState =
-      tagToViewState[reactTag]
-          ?: throw RetryableMountingLayerException(
-              "Unable to find viewState for tag $reactTag. Surface stopped: $isStopped"
-          )
 
   private fun getNullableViewState(reactTag: Int): ViewState? = tagToViewState[reactTag]
 
