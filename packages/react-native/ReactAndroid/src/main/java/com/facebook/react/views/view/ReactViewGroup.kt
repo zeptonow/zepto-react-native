@@ -503,41 +503,45 @@ public open class ReactViewGroup public constructor(context: Context?) :
     // and position is set prior to removing the view from its listview parent.
     // Otherwise, when view gets re-attached again, i.e when it re-enters the viewport after scroll,
     // it won't be size and located properly.
-    val isAnimating = child.animation?.hasEnded() == false
+    try {
+      val isAnimating = child.animation?.hasEnded() == false
 
-    val shouldSkipView = excludedViewsSet?.contains(child.id) == true
-    if (excludedViewsSet != null) {
-      needUpdateClippingRecursive = true
-    }
-    // We don't want to clip a view that is currently focused at that might break focus navigation
-    if (
-        !intersects &&
-            !isViewClipped(child, idx) &&
-            !isAnimating &&
-            child !== focusedChild &&
-            !shouldSkipView
-    ) {
-      setViewClipped(child, true)
-      // We can try saving on invalidate call here as the view that we remove is out of visible area
-      // therefore invalidation is not necessary.
-      removeViewInLayout(child)
-      needUpdateClippingRecursive = true
-    } else if ((shouldSkipView || intersects) && isViewClipped(child, idx)) {
-      val adjustedIdx = idx - clippedSoFar
-      check(adjustedIdx >= 0)
-      setViewClipped(child, false)
-      addViewInLayout(child, adjustedIdx, defaultLayoutParam, true)
-      invalidate()
-      needUpdateClippingRecursive = true
-    } else if (intersects) {
-      // If there is any intersection we need to inform the child to update its clipping rect
-      needUpdateClippingRecursive = true
-    }
-
-    if (needUpdateClippingRecursive) {
-      if ((child as? ReactClippingViewGroup)?.removeClippedSubviews == true) {
-        child.updateClippingRect(excludedViewsSet)
+      val shouldSkipView = excludedViewsSet?.contains(child.id) == true
+      if (excludedViewsSet != null) {
+        needUpdateClippingRecursive = true
       }
+      // We don't want to clip a view that is currently focused at that might break focus navigation
+      if (
+          !intersects &&
+              !isViewClipped(child, idx) &&
+              !isAnimating &&
+              child !== focusedChild &&
+              !shouldSkipView
+      ) {
+        setViewClipped(child, true)
+        // We can try saving on invalidate call here as the view that we remove is out of visible
+        // area therefore invalidation is not necessary.
+        removeViewInLayout(child)
+        needUpdateClippingRecursive = true
+      } else if ((shouldSkipView || intersects) && isViewClipped(child, idx)) {
+        val adjustedIdx = idx - clippedSoFar
+        check(adjustedIdx >= 0)
+        setViewClipped(child, false)
+        addViewInLayout(child, adjustedIdx, defaultLayoutParam, true)
+        invalidate()
+        needUpdateClippingRecursive = true
+      } else if (intersects) {
+        // If there is any intersection we need to inform the child to update its clipping rect
+        needUpdateClippingRecursive = true
+      }
+
+      if (needUpdateClippingRecursive) {
+        if ((child as? ReactClippingViewGroup)?.removeClippedSubviews == true) {
+          child.updateClippingRect(excludedViewsSet)
+        }
+      }
+    } catch (e: NullPointerException) {
+      FLog.e(TAG, "NullPointerException when executing updateSubviewClipStatus", e)
     }
   }
 
