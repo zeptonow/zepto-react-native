@@ -132,7 +132,7 @@ public class NetworkingModule(
   /** @param context the ReactContext of the application */
   public constructor(
       context: ReactApplicationContext
-  ) : this(context, null, OkHttpClientProvider.createClient(context.applicationContext), null)
+  ) : this(context, null, OkHttpClientProvider.getOkHttpClient(), null)
 
   /**
    * @param context the ReactContext of the application
@@ -145,7 +145,7 @@ public class NetworkingModule(
   ) : this(
       context,
       null,
-      OkHttpClientProvider.createClient(context.applicationContext),
+      OkHttpClientProvider.getOkHttpClient(),
       networkInterceptorCreators,
   )
 
@@ -160,7 +160,7 @@ public class NetworkingModule(
   ) : this(
       context,
       defaultUserAgent,
-      OkHttpClientProvider.createClient(context.applicationContext),
+      OkHttpClientProvider.getOkHttpClient(),
       null,
   )
 
