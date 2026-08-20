@@ -418,7 +418,7 @@ public open class ReactViewGroup public constructor(context: Context?) :
       return
     }
 
-    val clippingRect = checkNotNull(clippingRect)
+    val clippingRect = clippingRect ?: return
     calculateClippingRect(this, clippingRect)
     updateClippingToRect(clippingRect, excludedViews)
   }
@@ -452,7 +452,7 @@ public open class ReactViewGroup public constructor(context: Context?) :
       childrenRemovedWhileTransitioning?.contains(child.id) == true
 
   internal fun updateClippingToRect(clippingRect: Rect, excludedViewsSet: Set<Int>? = null) {
-    val childArray = checkNotNull(allChildren)
+    val childArray = allChildren ?: return
     inSubviewClippingLoop = true
     var clippedSoFar = 0
     for (i in 0..<allChildrenCount) {
@@ -477,9 +477,11 @@ public open class ReactViewGroup public constructor(context: Context?) :
         clippedSoFar++
       }
       if (i - clippedSoFar > childCount) {
-        throw IllegalStateException(
-            "Invalid clipping state. i=$i clippedSoFar=$clippedSoFar count=$childCount allChildrenCount=$allChildrenCount recycleCount=$recycleCount  excludedViews=${excludedViewsSet?.size ?: 0}"
+        FLog.e(
+            TAG,
+            "Invalid clipping state. i=$i clippedSoFar=$clippedSoFar count=$childCount allChildrenCount=$allChildrenCount recycleCount=$recycleCount  excludedViews=${excludedViewsSet?.size ?: 0}",
         )
+        break
       }
     }
     inSubviewClippingLoop = false
@@ -493,7 +495,7 @@ public open class ReactViewGroup public constructor(context: Context?) :
   ) {
     assertOnUiThread()
 
-    val child = checkNotNull(allChildren?.get(idx))
+    val child = allChildren?.get(idx) ?: return
     val intersects = clippingRect.intersects(child.left, child.top, child.right, child.bottom)
     var needUpdateClippingRecursive = false
 
@@ -542,6 +544,8 @@ public open class ReactViewGroup public constructor(context: Context?) :
       }
     } catch (e: NullPointerException) {
       FLog.e(TAG, "NullPointerException when executing updateSubviewClipStatus", e)
+    } catch (e: IllegalStateException) {
+      FLog.e(TAG, "IllegalStateException when executing updateSubviewClipStatus", e)
     }
   }
 
@@ -550,8 +554,8 @@ public open class ReactViewGroup public constructor(context: Context?) :
       return
     }
 
-    val clippingRect = checkNotNull(clippingRect)
-    val allChildren = checkNotNull(allChildren)
+    val clippingRect = clippingRect ?: return
+    val allChildren = allChildren ?: return
 
     // do fast check whether intersect state changed
     val intersects =
