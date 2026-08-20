@@ -286,12 +286,11 @@ internal constructor(
       val message =
           "Unable to add a view into a view that is not a ViewGroup. ParentTag: $parentTag - Tag: $tag - Index: $index"
       FLog.e(TAG, message)
-      throw IllegalStateException(message)
+      return
     }
     val parentView = parentViewState.view as ViewGroup
     val viewState = getNullableViewState(tag) ?: return
-    val view = viewState.view
-    checkNotNull(view) { "Unable to find view for viewState $viewState and tag $tag" }
+    val view = viewState.view ?: return
 
     // Display children before inserting
     if (SHOW_CHANGED_VIEW_HIERARCHIES) {
@@ -610,8 +609,9 @@ internal constructor(
       viewState.currentProps = ReactStylesDiffMap(props)
     }
 
-    val view: View = checkNotNull(viewState.view) { "Unable to find view for tag [$reactTag]" }
-    checkNotNull(viewState.viewManager).updateProperties(view, viewState.currentProps)
+    val view: View = viewState.view ?: return
+    val viewManager = viewState.viewManager ?: return
+    viewManager.updateProperties(view, viewState.currentProps)
   }
 
   /**
@@ -633,9 +633,10 @@ internal constructor(
     if (isStopped) {
       return
     }
+    val context = context ?: return
     viewManagerRegistry
         ?.get(componentName)
-        ?.experimental_prefetchResources(surfaceId, checkNotNull(context), params)
+        ?.experimental_prefetchResources(surfaceId, context, params)
   }
 
   @Deprecated("")
@@ -731,7 +732,7 @@ internal constructor(
       return
     }
 
-    val viewToUpdate = checkNotNull(viewState.view) { "Unable to find View for tag: $reactTag" }
+    val viewToUpdate = viewState.view ?: return
 
     viewToUpdate.layoutDirection =
         when (layoutDirection) {
@@ -804,9 +805,8 @@ internal constructor(
       return
     }
 
-    val viewToUpdate = checkNotNull(viewState.view) { "Unable to find View for tag: $reactTag" }
-    val viewManager =
-        checkNotNull(viewState.viewManager) { "Unable to find ViewManager for view: $viewState" }
+    val viewToUpdate = viewState.view ?: return
+    val viewManager = viewState.viewManager ?: return
 
     // noinspection unchecked
     viewManager.setPadding(viewToUpdate, left, top, right, bottom)
@@ -830,8 +830,7 @@ internal constructor(
       return
     }
 
-    val viewToUpdate = viewState.view
-    checkNotNull(viewToUpdate) { "Unable to find View for tag: $reactTag" }
+    val viewToUpdate = viewState.view ?: return
 
     if (viewToUpdate is ReactOverflowViewWithInset) {
       (viewToUpdate as ReactOverflowViewWithInset).setOverflowInset(
@@ -855,9 +854,8 @@ internal constructor(
     val prevStateWrapper = viewState.stateWrapper
     viewState.stateWrapper = stateWrapper
 
-    val viewManager =
-        checkNotNull(viewState.viewManager) { "Unable to find ViewManager for tag: $reactTag" }
-    val view = checkNotNull(viewState.view)
+    val viewManager = viewState.viewManager ?: return
+    val view = viewState.view ?: return
 
     val extraData = viewManager.updateState(view, viewState.currentProps, stateWrapper)
     if (extraData != null) {
