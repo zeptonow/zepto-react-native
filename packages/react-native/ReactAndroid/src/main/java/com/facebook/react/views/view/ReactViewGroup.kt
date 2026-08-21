@@ -804,7 +804,24 @@ public open class ReactViewGroup public constructor(context: Context?) :
    * @return `true` if the view has been removed from the ViewGroup.
    */
   private fun isViewClipped(view: View?, index: Int?): Boolean {
-    val view = checkNotNull(view)
+    if (view == null) {
+      // zepto: `allChildren` can hold a null below `allChildrenCount` while a clipping loop is
+      // running — `removeFromArray` nulls the tail slot and decrements the count, but the loops in
+      // `updateClippingToRect` / `updateSubviewClipStatus` iterate over a range snapshotted at
+      // entry. A missing entry has no attached view, so report it as clipped: that keeps the
+      // `clippedSoFar` -> attached-index mapping correct, and matches `updateSubviewClipStatus`,
+      // which already skips null entries. Previously this was `checkNotNull(view)`, which turned
+      // the inconsistency into a fatal IllegalStateException.
+      if (index != null) {
+        logSoftException(
+            ReactSoftExceptionLogger.Categories.RVG_IS_VIEW_CLIPPED,
+            ReactNoCrashSoftException(
+                "Null view in allChildren: index=$index allChildrenCount=$allChildrenCount childCount=$childCount"
+            ),
+        )
+      }
+      return true
+    }
     val tag = view.getTag(R.id.view_clipped)
     if (tag != null) {
       return tag as Boolean
