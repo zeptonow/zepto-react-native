@@ -685,15 +685,25 @@ jsi::Value UIManagerBinding::get(
           std::function<void(folly::dynamic)> jsCallback = [sharedCallback, runtimeExecutor](folly::dynamic args) {
             // Schedule call on JS
             runtimeExecutor([sharedCallback, args](jsi::Runtime& jsRuntime) {
-              // Invoke the actual callback we got from JS
-              sharedCallback->call(jsRuntime, {
-                                                  jsi::Value{jsRuntime, args.at(0).getDouble()},
-                                                  jsi::Value{jsRuntime, args.at(1).getDouble()},
-                                                  jsi::Value{jsRuntime, args.at(2).getDouble()},
-                                                  jsi::Value{jsRuntime, args.at(3).getDouble()},
-                                                  jsi::Value{jsRuntime, args.at(4).getDouble()},
-                                                  jsi::Value{jsRuntime, args.at(5).getDouble()},
-                                              });
+              // Invoke the actual callback we got from JS.
+              // Guard against stale callbacks: if the component that initiated
+              // measureAsyncOnUI was unmounted before the UI-thread measurement
+              // completed and called back, the jsi::Function target may be
+              // invalid. Without this catch, the stale call corrupts the JS
+              // heap and the next EventQueue::flushEvents SIGABRTs during
+              // RawEvent destruction (Crashlytics f3fc8ce40b804f510313f8f31035e8e7).
+              try {
+                sharedCallback->call(jsRuntime, {
+                                                    jsi::Value{jsRuntime, args.at(0).getDouble()},
+                                                    jsi::Value{jsRuntime, args.at(1).getDouble()},
+                                                    jsi::Value{jsRuntime, args.at(2).getDouble()},
+                                                    jsi::Value{jsRuntime, args.at(3).getDouble()},
+                                                    jsi::Value{jsRuntime, args.at(4).getDouble()},
+                                                    jsi::Value{jsRuntime, args.at(5).getDouble()},
+                                                });
+              } catch (...) {
+                // Component was unmounted before async measurement completed — silently drop
+              }
             });
           };
 
