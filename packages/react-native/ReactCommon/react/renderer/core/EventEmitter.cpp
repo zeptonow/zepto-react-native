@@ -91,11 +91,19 @@ void EventEmitter::dispatchEvent(
     return;
   }
 
+  SharedEventTarget eventTarget;
+  std::weak_ptr<const ShadowNodeFamily> shadowNodeFamily;
+  {
+    std::scoped_lock lock(DispatchMutex());
+    eventTarget = eventTarget_;
+    shadowNodeFamily = shadowNodeFamily_;
+  }
+
   eventDispatcher->dispatchEvent(RawEvent(
       normalizeEventType(std::move(type)),
       std::move(payload),
-      eventTarget_,
-      shadowNodeFamily_,
+      std::move(eventTarget),
+      std::move(shadowNodeFamily),
       category));
 }
 
@@ -117,11 +125,19 @@ void EventEmitter::dispatchUniqueEvent(
     return;
   }
 
+  SharedEventTarget eventTarget;
+  std::weak_ptr<const ShadowNodeFamily> shadowNodeFamily;
+  {
+    std::scoped_lock lock(DispatchMutex());
+    eventTarget = eventTarget_;
+    shadowNodeFamily = shadowNodeFamily_;
+  }
+
   eventDispatcher->dispatchUniqueEvent(RawEvent(
       normalizeEventType(std::move(type)),
       std::move(payload),
-      eventTarget_,
-      shadowNodeFamily_,
+      std::move(eventTarget),
+      std::move(shadowNodeFamily),
       RawEvent::Category::Continuous));
 }
 
