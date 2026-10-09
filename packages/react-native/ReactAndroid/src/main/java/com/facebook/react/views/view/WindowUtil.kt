@@ -124,6 +124,7 @@ internal fun Window.setStatusBarStyle(style: String?) {
 
 @Suppress("DEPRECATION")
 private fun Window.statusBarHide() {
+  if (!decorView.isAttachedToWindow) return
   if (isEdgeToEdgeFeatureFlagOn) {
     WindowInsetsControllerCompat(this, decorView).run {
       systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -143,6 +144,7 @@ private fun Window.statusBarHide() {
 
 @Suppress("DEPRECATION")
 private fun Window.statusBarShow() {
+  if (!decorView.isAttachedToWindow) return
   if (isEdgeToEdgeFeatureFlagOn) {
     WindowInsetsControllerCompat(this, decorView).run {
       systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
